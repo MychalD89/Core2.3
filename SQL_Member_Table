@@ -1,0 +1,115 @@
+--Reporting Period
+ Declare reporting_begin_date Date Default '2022-01-01';
+ Declare reporting_end_date Date Default '2022-12-31';
+ Declare prior_report_period_begin Date Default '2021-01-01';
+ Declare prior_report_period_end Date Default '2021-12-31';
+
+
+
+
+--Selecting all Tufts members from the tufts base member table 
+with StaticMMU_Tufts_Base as (
+Select distinct
+payerMemberId as memberid,
+patientId,
+firstName,
+lastname,
+dateOfBirth as dob,
+eligEffectiveDate as tuftsEnrollmentDate,
+case when eligEndDate is null then date('2100-12-31') else eligEndDate end as tuftsDisenrollmentDate,
+DATE_ADD(eligEffectiveDate, INTERVAL 90 DAY) as  tuftsEnrollmentDate_plus90,
+DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) as tuftsEnrollmentDate_plus3mo,
+trim(concat("Q",cast(EXTRACT(Quarter FROM DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) ) as string)," ",cast(EXTRACT(Year FROM DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) ) as string))) as Quarter
+From cityblock-analytics.abs_member.abs_enterprise_member_demo_compliance
+where partner = 'tufts' 
+)
+
+
+
+--tagging members whose 90th day of enrollment was in Q4 and their disenrollment date is equal to or past the reporting period
+,staticMMU as (
+select *
+,case when tuftsDisenrollmentDate>= tuftsEnrollmentDate_plus3mo then 1 else 0 end as _keep
+from StaticMMU_Tufts_Base
+where
+--Quarter= target_quarter and
+tuftsDisenrollmentDate >= tuftsEnrollmentDate_plus3mo
+)
+
+
+
+
+--Selecting all CBH assessments from the dbt model
+,assessments as (
+select distinct * ,
+dateofHra as assessmentDate
+from `cityblock-analytics.abs_client_reporting.compliance_tufts_mmu_assessment`
+--cityblock-analytics.abs_client_reporting.Tufts_Core_2_1__3_2_Assessments_Stage_01_31_2023
+where source = 'CBH'
+)
+
+
+--lastest assessments that occurred in the prior year reporting period
+,prior_report_year_assessments as (
+Select patientid, max(assessmentDate) as latest_assessment
+From
+assessments
+Where
+dateofhra between prior_report_period_begin and prior_report_period_end
+Group by patientid
+)
+
+
+-- first assessments that occurred in the current reporting year
+,current_report_year_assessments as (
+Select patientid, min(assessmentDate) as first_assessment
+From
+assessments
+Where
+dateofhra between reporting_begin_date and reporting_end_date
+Group by patientid
+)
+
+
+--Selecting members that had at least 90 days of continious enrollment in the prior reporting period
+, MemberContEnroll3MoPriorReportPeriod_staging as (
+Select *,
+case when tuftsEnrollmentDate < prior_report_period_begin then prior_report_period_begin else tuftsEnrollmentDate end as prior_begin,
+case when tuftsDisenrollmentDate > prior_report_period_end then prior_report_period_end else tuftsDisenrollmentDate end as prior_end
+From StaticMMU_Tufts_Base
+where tuftsEnrollmentDate <= prior_report_period_end
+)
+
+
+, MemberContEnroll3MoPriorReportPeriod_staging_two as (
+Select *, date_diff(date_add(prior_end, interval 1 day),prior_begin,Month) as Continuous_Months
+From MemberContEnroll3MoPriorReportPeriod_staging
+)
+
+, MemberContEnroll3MoPriorReportPeriod as (
+Select *
+FROM
+MemberContEnroll3MoPriorReportPeriod_staging_two
+)
+
+
+
+--Member Table
+Select distinct a.memberid, a.firstname, a.lastname, a.dob as dateofbirth, a.tuftsEnrollmentDate as enrollmentdate,
+a.tuftsDisenrollmentDate as term_date, 
+case when d.Continuous_Months >= 3 then "Yes" else "No" end as MemberContEnroll3MoPriorReportPeriod,
+b.latest_assessment as DateLastAssessmentPriorReportPeriod,
+c.first_assessment as DateFirstAssessmentReportPeriod
+From 
+StaticMMU_Tufts_Base as a 
+left join
+prior_report_year_assessments as b
+on a.patientid = b.patientid
+left join
+current_report_year_assessments as c 
+on a.patientid = c.patientid
+left join
+MemberContEnroll3MoPriorReportPeriod as d 
+on a.patientid = d.patientid
+WHERE
+a.tuftsDisenrollmentDate >= reporting_end_date
