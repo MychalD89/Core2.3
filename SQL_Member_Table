@@ -95,9 +95,10 @@ MemberContEnroll3MoPriorReportPeriod_staging_two
 
 
 --Member Table
+,member_detail_table as (
 Select distinct a.memberid, a.firstname, a.lastname, a.dob as dateofbirth, a.tuftsEnrollmentDate as enrollmentdate,
 a.tuftsDisenrollmentDate as term_date, 
-case when d.Continuous_Months >= 3 then "Yes" else "No" end as MemberContEnroll3MoPriorReportPeriod,
+case when d.Continuous_Months >= 3 then "Y" else "N" end as MemberContEnroll3MoPriorReportPeriod,
 b.latest_assessment as DateLastAssessmentPriorReportPeriod,
 c.first_assessment as DateFirstAssessmentReportPeriod
 From 
@@ -113,3 +114,42 @@ MemberContEnroll3MoPriorReportPeriod as d
 on a.patientid = d.patientid
 WHERE
 a.tuftsDisenrollmentDate >= reporting_end_date
+)
+
+
+--Total number of members enrolled as of the last day of the current reporting period.
+--Select count(distinct memberid)
+--From member_detail_table
+--7750
+
+
+--Total number of members who had an assessment completed during the previous reporting period.
+--Select count(distinct memberid)
+--From member_detail_table
+--where DateLastAssessmentPriorReportPeriod is null
+--6630
+
+--Total number of members with a reassessment completed during the current reporting period
+--Select count(distinct memberid)
+--from member_detail_table
+--where DateLastAssessmentPriorReportPeriod is not null and DateFirstAssessmentReportPeriod is not null
+--993
+
+--Total number of members with a reassessment completed within 365 days of the most recent assessment completed.
+--Select count(distinct memberid)
+--From member_detail_table
+--Where date_diff(DateFirstAssessmentReportPeriod,DateLastAssessmentPriorReportPeriod,DAY) <= 365
+--773
+
+--Total number of members who did not have an assessment completed during the previous reporting period.
+--Select count(distinct memberid)
+--From member_detail_table
+--where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null
+--1687
+
+--Total number of members with an assessment completed during the current reporting period.
+--Select count(distinct memberid)
+--From member_detail_table
+--where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null and
+--DateFirstAssessmentReportPeriod is not null
+--1070
