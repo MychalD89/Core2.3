@@ -26,11 +26,83 @@ where partner = 'tufts'
 
 
 --Selecting all CBH assessments from the dbt model
-,assessments as (
+,assessments_staging as (
 select distinct * ,
 dateofHra as assessmentDate
 from `cityblock-analytics.abs_client_reporting.DBT_Assessments_Model_Output_02_09_2023`
 where source = 'CBH'
+)
+
+--Removing pseudo assessments
+,HRA_pseudo_assessments as (
+Select distinct a.*
+From 
+(
+Select *
+from assessments_staging
+where source = 'CBH' and HRA_assessmentID is not null
+) as a 
+full join
+(
+select* from `cityblock-analytics.mrt_commons.questions_answers_all` 
+where answerSlug = 'pseudo'
+) as b
+on a.HRA_assessmentID = b.assessmentid
+where b.assessmentid is null
+)
+
+,Comp_pseudo_assessments as (
+Select distinct a.*
+From 
+(
+Select *
+from assessments_staging
+where source = 'CBH' and comp_assessmentID is not null
+) as a 
+full join
+(
+select* from `cityblock-analytics.mrt_commons.questions_answers_all` 
+where answerSlug = 'pseudo'
+) as b
+on a.comp_assessmentID = b.assessmentid
+where b.assessmentid is null
+)
+
+,MDS_pseudo_assessments as (
+Select distinct a.*
+From 
+(
+Select *
+from assessments_staging
+where source = 'CBH' and mds_assessmentID is not null
+) as a 
+full join
+(
+select* from `cityblock-analytics.mrt_commons.questions_answers_all` 
+where answerSlug = 'pseudo'
+) as b
+on a.mds_assessmentID = b.assessmentid
+where b.assessmentid is null
+)
+
+--Combining CBH non-pseudo assessments
+, assessments as (
+Select *
+FROM
+HRA_pseudo_assessments
+
+UNION DISTINCT
+
+
+Select *
+FROM
+Comp_pseudo_assessments
+ 
+Union DISTINCT
+
+Select *
+From 
+MDS_pseudo_assessments
 )
 
 
