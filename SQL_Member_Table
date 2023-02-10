@@ -25,26 +25,11 @@ where partner = 'tufts'
 )
 
 
-
---tagging members whose 90th day of enrollment was in Q4 and their disenrollment date is equal to or past the reporting period
-,staticMMU as (
-select *
-,case when tuftsDisenrollmentDate>= tuftsEnrollmentDate_plus3mo then 1 else 0 end as _keep
-from StaticMMU_Tufts_Base
-where
---Quarter= target_quarter and
-tuftsDisenrollmentDate >= tuftsEnrollmentDate_plus3mo
-)
-
-
-
-
 --Selecting all CBH assessments from the dbt model
 ,assessments as (
 select distinct * ,
 dateofHra as assessmentDate
-from `cityblock-analytics.abs_client_reporting.compliance_tufts_mmu_assessment`
---cityblock-analytics.abs_client_reporting.Tufts_Core_2_1__3_2_Assessments_Stage_01_31_2023
+from `cityblock-analytics.abs_client_reporting.DBT_Assessments_Model_Output_02_09_2023`
 where source = 'CBH'
 )
 
@@ -93,11 +78,10 @@ MemberContEnroll3MoPriorReportPeriod_staging_two
 )
 
 
-
 --Member Table
 ,member_detail_table as (
-Select distinct a.memberid, a.firstname, a.lastname, a.dob as dateofbirth, a.tuftsEnrollmentDate as enrollmentdate,
-a.tuftsDisenrollmentDate as term_date, 
+Select distinct a.memberid, a.firstname, a.lastname,   format_date("%m/%d/%Y", a.dob) as dateofbirth, format_date("%m/%d/%Y",a.tuftsEnrollmentDate)  as enrollmentdate,
+format_date("%m/%d/%Y",a.tuftsDisenrollmentDate) as term_date, 
 case when d.Continuous_Months >= 3 then "Y" else "N" end as MemberContEnroll3MoPriorReportPeriod,
 b.latest_assessment as DateLastAssessmentPriorReportPeriod,
 c.first_assessment as DateFirstAssessmentReportPeriod
@@ -117,39 +101,50 @@ a.tuftsDisenrollmentDate >= reporting_end_date
 )
 
 
+--Element A
 --Total number of members enrolled as of the last day of the current reporting period.
---Select count(distinct memberid)
---From member_detail_table
---7750
+/*
+Select count(distinct memberid)
+From member_detail_table
+*/
 
-
+--Element B
 --Total number of members who had an assessment completed during the previous reporting period.
---Select count(distinct memberid)
---From member_detail_table
---where DateLastAssessmentPriorReportPeriod is null
---6630
+/*
+Select count(distinct memberid)
+From member_detail_table
+where DateLastAssessmentPriorReportPeriod is not null
+*/
 
+--Element C
 --Total number of members with a reassessment completed during the current reporting period
---Select count(distinct memberid)
---from member_detail_table
---where DateLastAssessmentPriorReportPeriod is not null and DateFirstAssessmentReportPeriod is not null
---993
+/*
+Select count(distinct memberid)
+from member_detail_table
+where DateLastAssessmentPriorReportPeriod is not null and DateFirstAssessmentReportPeriod is not null
+*/
 
+--Element D
 --Total number of members with a reassessment completed within 365 days of the most recent assessment completed.
---Select count(distinct memberid)
---From member_detail_table
---Where date_diff(DateFirstAssessmentReportPeriod,DateLastAssessmentPriorReportPeriod,DAY) <= 365
---773
+/*
+Select count(distinct memberid)
+From member_detail_table
+Where date_diff(cast(DateFirstAssessmentReportPeriod as date),cast(DateLastAssessmentPriorReportPeriod as date),DAY) <= 365
+*/
 
+--Element E
 --Total number of members who did not have an assessment completed during the previous reporting period.
---Select count(distinct memberid)
---From member_detail_table
---where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null
---1687
+/*
+Select count(distinct memberid)
+From member_detail_table
+where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null
+*/
 
+--Element F
 --Total number of members with an assessment completed during the current reporting period.
---Select count(distinct memberid)
---From member_detail_table
---where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null and
---DateFirstAssessmentReportPeriod is not null
---1070
+/*
+Select count(distinct memberid)
+From member_detail_table
+where MemberContEnroll3MoPriorReportPeriod = "Y" and DateLastAssessmentPriorReportPeriod is null and
+DateFirstAssessmentReportPeriod is not null
+*/
