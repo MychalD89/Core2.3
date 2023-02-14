@@ -22,6 +22,7 @@ DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) as tufts
 trim(concat("Q",cast(EXTRACT(Quarter FROM DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) ) as string)," ",cast(EXTRACT(Year FROM DATE_SUB(DATE_ADD(eligEffectiveDate, INTERVAL 3 Month), INTERVAL 1 DAY) ) as string))) as Quarter
 From cityblock-analytics.abs_member.abs_enterprise_member_demo_compliance
 where partner = 'tufts' 
+and (eligEffectiveDate <= reporting_end_date) and (eligEndDate >= reporting_end_date) 
 )
 
 
