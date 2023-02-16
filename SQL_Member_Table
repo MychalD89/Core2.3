@@ -30,7 +30,7 @@ and (eligEffectiveDate <= reporting_end_date) and (eligEndDate >= reporting_end_
 ,assessments_staging as (
 select distinct * ,
 dateofHra as assessmentDate
-from `cityblock-analytics.abs_client_reporting.DBT_Assessments_Model_Output_02_09_2023`
+from `cityblock-analytics.abs_client_reporting.Tufts_Core_2_3_Member_Level_Detail_02_16_2023`
 where source = 'CBH'
 )
 
